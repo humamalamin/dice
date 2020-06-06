@@ -1,0 +1,48 @@
+{{ define "form" }}
+<!DOCTYPE html>
+<html>
+    <head>
+        <title>Input Name</title>
+    </head>
+    <body>
+        <form method="post" action="/room">
+            <label>Name :</label>
+            <input type="text" placeholder="Type name here" name="name" required />
+            <br />
+
+            <button type="submmit">Login</button>
+        </form>
+    </body>
+</html>
+{{ end }}
+
+{{ define "room" }}
+<!DOCTYPE html>
+<html>
+    <head>
+        <title>Room</title>
+    </head>
+    <body>
+        <h1>Nama : {{ .name }}</h1>
+        <h2>Score : {{ .score }}</h2>
+        <form method="post" action="/process">
+            <input type="hidden" name="hide_name" value="{{ .name }}">
+            <button type="submmit">Play</button>
+        </form>
+    </body>
+</html>
+{{ end }}
+
+{{ define "result" }}
+<!DOCTYPE html>
+<html>
+    <head>
+        <title>Show Name</title>
+    </head>
+    <body>
+        <h1>Hello {{.name}}</h1>
+        <p>Dice : {{.dice}}</p>
+        <p>Dice : {{.score}}</p>
+    </body>
+</html>
+{{ end }}
