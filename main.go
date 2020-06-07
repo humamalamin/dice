@@ -16,6 +16,7 @@ import (
 var name string
 var id int
 var score int
+var count int
 
 var onlyOnce sync.Once
 
@@ -39,13 +40,6 @@ func main() {
 
 	fmt.Println("server started at localhost:9001")
 	http.ListenAndServe(":9001", nil)
-	// name := name()
-
-	// fmt.Println("Name ", name)
-
-	// dice1 := rollDice()
-
-	// fmt.Println("Dice 1: ", dice1)
 }
 
 func routeIndexGet(w http.ResponseWriter, r *http.Request) {
@@ -65,7 +59,7 @@ func routeIndexGet(w http.ResponseWriter, r *http.Request) {
 
 func routeRoomPost(w http.ResponseWriter, r *http.Request) {
 	database, _ := sql.Open("sqlite3", "database/dice.db")
-	statement, _ := database.Prepare("CREATE TABLE IF NOT EXISTS dices (id INTEGER PRIMARY KEY, name TEXT, score INTEGER)")
+	statement, _ := database.Prepare("CREATE TABLE IF NOT EXISTS dices (id INTEGER PRIMARY KEY, name TEXT, score INTEGER, count INTEGER)")
 
 	statement.Exec()
 	if r.Method == "POST" {
@@ -78,16 +72,20 @@ func routeRoomPost(w http.ResponseWriter, r *http.Request) {
 
 		name = r.FormValue("name")
 
-		rows, err := database.Query("SELECT SUM(score) as score FROM dices WHERE name =" + name)
+		sql := fmt.Sprintf("SELECT score, count, id FROM dices WHERE UPPER(name) = UPPER('%s')", name)
+		rows, err := database.Query(sql)
 		if err != nil {
+			fmt.Println(err.Error())
 			score = 0
+			count = 0
+			id = 0
 		} else {
 			for rows.Next() {
-				rows.Scan(&score)
+				rows.Scan(&score, &count, &id)
 			}
 		}
 
-		var data = map[string]string{"name": name, "score": strconv.Itoa(score)}
+		var data = map[string]string{"name": name, "score": strconv.Itoa(score), "count": strconv.Itoa(count), "id": strconv.Itoa(id)}
 
 		if err := tmpl.Execute(w, data); err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -100,7 +98,7 @@ func routeRoomPost(w http.ResponseWriter, r *http.Request) {
 
 func routeIndexPost(w http.ResponseWriter, r *http.Request) {
 	database, _ := sql.Open("sqlite3", "database/dice.db")
-	statement, _ := database.Prepare("CREATE TABLE IF NOT EXISTS dices (id INTEGER PRIMARY KEY, name TEXT, score INTEGER)")
+	statement, _ := database.Prepare("CREATE TABLE IF NOT EXISTS dices (id INTEGER PRIMARY KEY, name TEXT, score INTEGER, count INTEGER)")
 
 	statement.Exec()
 	if r.Method == "POST" {
@@ -112,21 +110,43 @@ func routeIndexPost(w http.ResponseWriter, r *http.Request) {
 		}
 
 		name = r.FormValue("hide_name")
+		diceId, _ := strconv.Atoi(r.FormValue("dice_id"))
+		diceCount, _ := strconv.Atoi(r.FormValue("count"))
+		diceScore, _ := strconv.Atoi(r.FormValue("dice_score"))
 		dice := rollDice()
 
 		sum := 0
-		if sum == 1 || sum == 3 || sum == 5 {
+		if dice == 1 || dice == 3 || dice == 5 {
 			sum += 5
 		} else {
 			sum -= 3
 		}
 
-		statement, _ = database.Prepare("INSERT INTO dices (name, score) VALUES (?, ?)")
-		statement.Exec(name, sum)
+		diceScore += sum
+		diceCount += 1
 
-		rows, err := database.Query("SELECT SUM(score) as score FROM dices WHERE name =" + name)
+		if diceId != 0 {
+			statement, eror := database.Prepare("UPDATE dices SET score = ?, count = ? WHERE id= ?")
+			if eror != nil {
+				http.Error(w, eror.Error(), http.StatusInternalServerError)
+				return
+			} else {
+				statement.Exec(diceScore, diceCount, diceId)
+			}
+		} else {
+			statement, eror := database.Prepare("INSERT INTO dices (name, score, count) VALUES (?, ?, ?)")
+
+			if eror != nil {
+				http.Error(w, eror.Error(), http.StatusInternalServerError)
+				return
+			} else {
+				statement.Exec(name, diceScore, diceCount)
+			}
+		}
+
+		rows, err := database.Query("SELECT score FROM dices WHERE name =" + `name`)
 		if err != nil {
-			http.Error(w, "ERROR", http.StatusInternalServerError)
+			http.Error(w, err.Error(), http.StatusInternalServerError)
 		} else {
 			for rows.Next() {
 				rows.Scan(&score)
